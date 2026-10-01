@@ -35,24 +35,30 @@ ID_CANAL_BIENVENIDAS = 1549569523038822502
 
 COLOR_ANUNCIO = 39423
 
+# ENLACE DIRECTO COMPATIBLE CON PILLOW PARA RENDERIZAR TUS RAYOS AZULES NATIVOS
+URL_FONDO_DIRECTO = "https://i.imgur.com/lBhnwMg.png"
+
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ====================================================================
-# LÓGICA DE DIBUJO REAL: LECTURA DE FONDO.PNG LOCAL + FUENTE DISCORD NATIVA
+# LÓGICA DE DIBUJO REAL: DESCARGA DIRECTA DE ENLACE PNG + FUENTE DISCORD
 # ====================================================================
 def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
-    # Forzamos la carga del archivo físico que subiste a GitHub para garantizar los rayos azules
     try:
-        base = Image.open("Fondo.png").convert("RGBA")
+        # Descargamos el archivo de imagen puro .png directamente en memoria
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res_fondo = requests.get(URL_FONDO_DIRECTO, headers=headers, timeout=10)
+        base = Image.open(io.BytesIO(res_fondo.content)).convert("RGBA")
+        print("✅ Imagen de rayos azules de Imgur cargada correctamente en Pillow.")
     except Exception as e:
-        print(f"Error cargando Fondo.png local: {e}")
+        print(f"Error descargando el fondo desde URL_FONDO_DIRECTO: {e}")
         try:
-            base = Image.open("fondo.png").convert("RGBA")
+            base = Image.open("Fondo.png").convert("RGBA")
         except Exception:
             base = Image.new("RGBA", (738, 329), (15, 17, 20, 255))
 
-    # Dimensiones exactas de pantalla completa estilo Koya
+    # Redimensionamos el lienzo al tamaño oficial a pantalla completa (738x329)
     base = base.resize((738, 329))
     
     # Cargamos tu tipografía física de Discord
@@ -71,16 +77,16 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     texto_arriba = "BIENVENID@"
     texto_abajo = usuario_nombre.upper()
     
-    # Dibujamos las sombras con un desplazamiento fuerte para que resalten sobre los rayos
+    # Dibujamos las sombras desplazadas de forma sólida antes del desenfoque
     draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 255), font=font_bienvenido, anchor="mm")
     draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 255), font=font_nombre, anchor="mm")
     
     capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=5))
     
-    # Acoplamos la sombra sobre tu fondo original de NicoShop
+    # Acoplamos las sombras sobre tu fondo de rayos azules de NicoShop
     base = Image.alpha_composite(base, capa_sombra_difuminada)
     
-    # Dibujamos el texto blanco sólido final arriba
+    # Capa final para las letras blancas sólidas del frente
     draw_final = ImageDraw.Draw(base)
     draw_final.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
     draw_final.text((369, 275), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
@@ -97,7 +103,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
         avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
         avatar_circular.putalpha(mascara)
         
-        # Borde circular nítido blanco
+        # Borde circular nítido blanco alrededor del avatar
         draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=4)
         base.paste(avatar_circular, (299, 34), avatar_circular)
     except Exception as e:
@@ -137,8 +143,7 @@ async def ejecutar_flujo_bienvenida(member, canal):
             )
             archivo_adjunto = discord.File(banner_bytes, filename="bienvenida_nicoshop.png")
             
-            # EL TRUCO MAESTRO: Enviamos el archivo suelto en el canal para que se vea
-            # GIGANTE a pantalla completa abajo del todo, exactamente igual que Koya Bot.
+            # Mantenemos el archivo adjunto suelto para que se mande a pantalla completa abajo
             await canal.send(content=texto_contenido, embed=embed, file=archivo_adjunto)
             print(f"👋 ¡Bienvenida a pantalla completa enviada con éxito para {member.name}!")
         except Exception as e:
@@ -146,6 +151,7 @@ async def ejecutar_flujo_bienvenida(member, canal):
             await canal.send(content=texto_contenido, embed=embed)
     else:
         await canal.send(content=texto_contenido, embed=embed)
+
 # ====================================================================
 # BOTÓN DE VERIFICACIÓN NATIVO DE REGLAS
 # ====================================================================
