@@ -4,8 +4,11 @@ import discord
 from discord.ext import commands
 import asyncio
 import nest_asyncio
+import requests
+import io
 import threading
 from flask import Flask
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 nest_asyncio.apply()
 
@@ -31,12 +34,113 @@ ID_ROL_A_DAR = 1549569521566875752
 ID_CANAL_BIENVENIDAS = 1549569523038822502  
 
 COLOR_ANUNCIO = 39423
+URL_FONDO_BANNER = "https://imgur.com"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# DESCARGA DE FUENTE SANS-SERIF ESTILO DISCORD
+try:
+    font_res = requests.get("https://github.com")
+    fuente_bytes = io.BytesIO(font_res.content)
+except Exception:
+    fuente_bytes = None
+
 # ====================================================================
-# LÓGICA DEL BOTÓN INTERACTIVO NATIVO DE REGLAS
+# LÓGICA DE DIBUJO: REPLICAR EL BANNER TAL CUAL LA IMAGEN
+# ====================================================================
+def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
+    try:
+        res_fondo = requests.get(URL_FONDO_BANNER, timeout=10)
+        base = Image.open(io.BytesIO(res_fondo.content)).convert("RGBA")
+    except Exception:
+        base = Image.new("RGBA", (738, 329), (20, 22, 25, 255))
+
+    # Redimensionamos la imagen al tamaño exacto estándar de los flyers de bienvenida (738x329)
+    base = base.resize((738, 329))
+    draw = ImageDraw.Draw(base)
+    
+    # 1. Procesamos el avatar del usuario en un círculo perfecto centrado
+    try:
+        avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+        avatar_img = avatar_img.resize((140, 140))
+        
+        mascara = Image.new("L", (140, 140), 0)
+        mask_draw = ImageDraw.Draw(mascara)
+        mask_draw.ellipse((0, 0, 140, 140), fill=255)
+        
+        avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
+        avatar_circular.putalpha(mascara)
+        
+        # Dibujamos un contorno blanco circular delgado de fondo para resaltar el avatar
+        draw.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=3)
+        # Pegamos el avatar en el centro superior del banner
+        base.paste(avatar_circular, (299, 34), avatar_circular)
+    except Exception as e:
+        print(f"Error procesando avatar: {e}")
+
+    # 2. Configuramos las fuentes tipográficas estilo Discord
+    try:
+        if fuente_bytes:
+            fuente_bytes.seek(0)
+            font_bienvenido = ImageFont.truetype(fuente_bytes, 42)
+            fuente_bytes.seek(0)
+            font_nombre = ImageFont.truetype(fuente_bytes, 28)
+        else:
+            font_bienvenido = ImageFont.load_default()
+            font_nombre = ImageFont.load_default()
+    except Exception:
+        font_bienvenido = ImageFont.load_default()
+        font_nombre = ImageFont.load_default()
+
+    # 3. Estampamos los textos centrados imitando tu captura al 100%
+    texto_arriba = "BIENVENID@"
+    texto_abajo = usuario_nombre.upper() # Lo fuerza a mayúsculas como en la imagen
+    
+    # Letras blancas sólidas con la distribución exacta de tu flyer
+    draw.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
+    draw.text((369, 265), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
+    
+    img_byte_arr = io.BytesIO()
+    base.save(img_byte_arr, format="PNG")
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+# ====================================================================
+# FLUJO DE BIENVENIDA (TU JSON EXACTO) + BANNER REPLICADO
+# ====================================================================
+async def ejecutar_flujo_bienvenida(member, canal):
+    texto_contenido = f"👾 Bienvenid@ {member.mention} a **{member.guild.name}**!👾"
+    
+    bienvenida_texto = (
+        "Bienvenidos a la comunidad de Nicoshop\n\n"
+        "Nos alegra tenerte con nosotros. Aquí encuentras los mejores precios en general 🥇\n\n"
+        "<#1549569523038822501> Para comenzar dentro de la comunidad y entender las reglas.\n"
+        "<#1549569523038822503> para estar al tanto de los anuncios e información. 📢"
+    )
+    
+    embed = discord.Embed(description=bienvenida_texto, color=COLOR_ANUNCIO)
+    
+    try:
+        avatar_res = requests.get(member.display_avatar.url, timeout=10)
+        avatar_bytes = avatar_res.content if avatar_res.status_code == 200 else None
+    except Exception:
+        avatar_bytes = None
+
+    if avatar_bytes:
+        loop = asyncio.get_event_loop()
+        banner_bytes = await loop.run_in_executor(
+            None, crear_banner_estilo_koya, member.name, avatar_bytes
+        )
+        archivo_adjunto = discord.File(banner_bytes, filename="bienvenida_nicoshop.png")
+        await canal.send(content=texto_contenido, embed=embed, file=archivo_adjunto)
+        print(f"👋 ¡Bienvenida enviada con éxito a {member.name}!")
+    else:
+        await canal.send(content=texto_contenido, embed=embed)
+        print(f"👋 ¡Bienvenida enviada con éxito a {member.name}!")
+
+# ====================================================================
+# BOTÓN DE VERIFICACIÓN NATIVO DE REGLAS
 # ====================================================================
 class VistaVerificacionNativa(discord.ui.View):
     def __init__(self):
@@ -59,26 +163,12 @@ class VistaVerificacionNativa(discord.ui.View):
 @bot.event
 async def on_member_join(member):
     canal = bot.get_channel(ID_CANAL_BIENVENIDAS)
-    if not canal:
-        print(f"❌ Error: No se encontró el canal de bienvenidas.")
-        return
+    if canal:
+        await ejecutar_flujo_bienvenida(member, canal)
 
-    texto_contenido = f"👾 Bienvenid@ {member.mention} a **{member.guild.name}**!👾"
-
-    bienvenida_texto = (
-        "Bienvenidos a la comunidad de Nicoshop\n\n"
-        "Nos alegra tenerte con nosotros. Aquí encuentras los mejores precios en general 🥇\n\n"
-        "<#1549569523038822501> Para comenzar dentro de la comunidad y entender las reglas.\n"
-        "<#1549569523038822503> para estar al tanto de los anuncios e información. 📢"
-    )
-
-    embed = discord.Embed(description=bienvenida_texto, color=COLOR_ANUNCIO)
-
-    try:
-        await canal.send(content=texto_contenido, embed=embed)
-        print(f"👋 ¡Bienvenida enviada con éxito a {member.name}!")
-    except discord.Forbidden:
-        print("❌ Error: El bot no tiene permisos para escribir en el canal de bienvenidas.")
+@bot.command()
+async def probar(ctx):
+    await ejecutar_flujo_bienvenida(ctx.author, ctx.channel)
 
 @bot.event
 async def on_ready():
@@ -127,34 +217,19 @@ async def on_ready():
             "\n\n<#1549678588100485180> Canal de voz para escuchar música y disfrutarla junto a la comunidad."
             "\n\n<#1549679253748981780> Canal de voz para jugar, conversar y pasar un rato relajado."
             "\n\n<#1549679422737621093> Canal de voz destinado a realizar y participar en sorteos."
-            "\n\n*A continuación encontrarás un botón de iniciar en la parte inferior donde debes clickear para aceptar que leíste las reglas y obtener tu rol para empezar!!*"
+            "\n\nA continuación encontrarás un botón de iniciar en la parte inferior donde debes clickear para aceptar que leíste las reglas y obtener tu rol para empezar!!"
             "\n\n⬇️⬇️⬇️"
         )
-        embed = discord.Embed(title="【📜】┃𝐑𝐄𝐆𝐋𝐀𝐒", description=reglas_texto, color=COLOR_ANUNCIO)
-        await canal.send(embed=embed, view=VistaVerificacionNativa())
-        print("✅ S1: Mensaje de reglas con botón verde republicado.")
-
-async def main():
-    # Iniciamos el servidor web Flask en segundo plano
-    t = threading.Thread(target=mantener_vivo)
-    t.daemon = True
-    t.start()
-    # Arrancamos el bot de Discord de forma segura
-    try:
-        await bot.start(TOKEN_BOT)
-    except Exception as e:
-        print(f"Error al iniciar el bot: {e}")
-
-# ====================================================================
-# ARRANQUE GENERAL DEL BOT (MÉTODO COMPATIBLE 24/7 EN RENDER)
-# ====================================================================
-if __name__ == "__main__":
-    # 1. Iniciamos el servidor web Flask en segundo plano
-    t = threading.Thread(target=mantener_vivo)
-    t.daemon = True
-    t.start()
-    
-    # 2. Arrancamos el bot usando el método nativo e inquebrantable
-    bot.run(TOKEN_BOT)
-
-
+embed = discord.Embed(title="【📜】┃𝐑𝐄𝐆𝐋𝐀𝐒", description=reglas_texto, color=COLOR_ANUNCIO)
+await canal.send(embed=embed, view=VistaVerificacionNativa())
+print("✅ S1: Mensaje de reglas con botón verde republicado.")
+async def arrancar_todo():
+t = threading.Thread(target=mantener_vivo)
+t.daemon = True
+t.start()
+try:
+await bot.start(TOKEN_BOT)
+except Exception as e:
+print(f"Error: {e}")
+if name == "main":
+asyncio.run(arrancar_todo())
