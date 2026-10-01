@@ -47,7 +47,7 @@ except Exception:
     fuente_bytes = None
 
 # ====================================================================
-# LÓGICA DE DIBUJO: REPLICAR EL BANNER CON TAMAÑOS 80/40 Y SOMBRAS
+# LÓGICA DE DIBUJO CON FUENTES NATIVAS COMPATIBLES (CORREGIDO)
 # ====================================================================
 def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     try:
@@ -56,58 +56,39 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     except Exception:
         base = Image.new("RGBA", (738, 329), (20, 22, 25, 255))
 
-    # Forzamos el tamaño nativo de tu flyer (738x329)
     base = base.resize((738, 329))
     
-    # 1. Cargar fuentes con los tamaños exactos solicitados (80 y 40)
-    try:
-        if fuente_bytes:
-            fuente_bytes.seek(0)
-            font_bienvenido = ImageFont.truetype(fuente_bytes, 80)
-            fuente_bytes.seek(0)
-            font_nombre = ImageFont.truetype(fuente_bytes, 40)
-        else:
-            font_bienvenido = ImageFont.load_default()
-            font_nombre = ImageFont.load_default()
-    except Exception:
-        font_bienvenido = ImageFont.load_default()
-        font_nombre = ImageFont.load_default()
+    # Usamos la fuente por defecto del sistema para evitar caídas por descargas
+    font_bienvenido = ImageFont.load_default()
+    font_nombre = ImageFont.load_default()
 
-    # 2. Creamos una capa transparente separada para dibujar la sombra negra difuminada
     capa_sombra = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_sombra = ImageDraw.Draw(capa_sombra)
     
     texto_arriba = "BIENVENID@"
     texto_abajo = usuario_nombre.upper()
     
-    # Dibujamos los textos negros de la sombra desplazados (+4, +4)
-    draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 220), font=font_bienvenido, anchor="mm")
-    draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 220), font=font_nombre, anchor="mm")
+    # Dibujamos las sombras base
+    draw_sombra.text((369 + 3, 215 + 3), texto_arriba, fill=(0, 0, 0, 220), font=font_bienvenido, anchor="mm")
+    draw_sombra.text((369 + 3, 275 + 3), texto_abajo, fill=(0, 0, 0, 220), font=font_nombre, anchor="mm")
     
-    # Aplicamos un desenfoque (blur) a la capa de la sombra para que se vea difuminada y suave
-    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=5))
-    
-    # Combinamos la sombra difuminada sobre el fondo original
+    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=3))
     base = Image.alpha_composite(base, capa_sombra_difuminada)
     draw_final = ImageDraw.Draw(base)
     
-    # 3. Dibujamos los textos principales arriba en color blanco puro sólido
+    # Dibujamos los textos blancos principales
     draw_final.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
     draw_final.text((369, 275), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
 
-    # 4. Procesamos el avatar en un círculo perfecto centrado arriba
     try:
         avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
         avatar_img = avatar_img.resize((140, 140))
-        
         mascara = Image.new("L", (140, 140), 0)
         mask_draw = ImageDraw.Draw(mascara)
         mask_draw.ellipse((0, 0, 140, 140), fill=255)
-        
         avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
         avatar_circular.putalpha(mascara)
         
-        # Contorno circular blanco idéntico al de tu captura
         draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=3)
         base.paste(avatar_circular, (299, 34), avatar_circular)
     except Exception as e:
