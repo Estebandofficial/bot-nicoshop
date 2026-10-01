@@ -134,16 +134,17 @@ async def on_ready():
         await canal.send(embed=embed, view=VistaVerificacionNativa())
         print("✅ S1: Mensaje de reglas con botón verde republicado.")
 
-async def arrancar_todo():
+async def main():
+    # Iniciamos el servidor web Flask en segundo plano
     t = threading.Thread(target=mantener_vivo)
+    t.daemon = True
     t.start()
+    # Arrancamos el bot de Discord de forma segura
     try:
         await bot.start(TOKEN_BOT)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error al iniciar el bot: {e}")
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(arrancar_todo())
-    loop.run_forever()
+    asyncio.run(main())
 
