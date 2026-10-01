@@ -1,4 +1,5 @@
 import discord
+import os
 from discord.ext import commands
 import asyncio
 import nest_asyncio
@@ -22,7 +23,7 @@ def mantener_vivo():
 # ====================================================================
 # CONFIGURACIÓN GENERAL - NICOSHOP
 # ====================================================================
-TOKEN_BOT = "MTU1MDI2MzczMzgxNTYxMTQzMg.GoSsZ5.TQKUhFYhx0wd8FmvR6-HGpxnwhRsZQNpOd4jbU"
+TOKEN_BOT = os.getenv("MTU1MDI2MzczMzgxNTYxMTQzMg.Gt_Jo9.tPvm7Lm9slRLiVQbJAtlMx02QHllJ2unyKFfFw")
 
 ID_CANAL_REGLAS = 1549569523038822501       
 ID_ROL_A_DAR = 1549569521566875752          
