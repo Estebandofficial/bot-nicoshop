@@ -23,7 +23,7 @@ def mantener_vivo():
 # ====================================================================
 # CONFIGURACIÓN GENERAL - NICOSHOP
 # ====================================================================
-TOKEN_BOT = os.getenv("MTU1MDI2MzczMzgxNTYxMTQzMg.Gt_Jo9.tPvm7Lm9slRLiVQbJAtlMx02QHllJ2unyKFfFw")
+TOKEN_BOT = os.getenv("TOKEN_DISCORD")
 
 ID_CANAL_REGLAS = 1549569523038822501       
 ID_ROL_A_DAR = 1549569521566875752          
