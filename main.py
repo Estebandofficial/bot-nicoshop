@@ -145,6 +145,16 @@ async def main():
     except Exception as e:
         print(f"Error al iniciar el bot: {e}")
 
+# ====================================================================
+# ARRANQUE GENERAL DEL BOT (MÉTODO COMPATIBLE 24/7 EN RENDER)
+# ====================================================================
 if __name__ == "__main__":
-    asyncio.run(main())
+    # 1. Iniciamos el servidor web Flask en segundo plano
+    t = threading.Thread(target=mantener_vivo)
+    t.daemon = True
+    t.start()
+    
+    # 2. Arrancamos el bot usando el método nativo e inquebrantable
+    bot.run(TOKEN_BOT)
+
 
