@@ -34,27 +34,28 @@ ID_ROL_A_DAR = 1549569521566875752
 ID_CANAL_BIENVENIDAS = 1549569523038822502  
 
 COLOR_ANUNCIO = 39423
-URL_FONDO_BANNER = "https://i.imgur.com/lBhnwMg.png"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ====================================================================
-# LÓGICA DE DIBUJO CORREGIDA: FUSIÓN DE FONDO DE RAYOS AZULES REAL
+# LÓGICA DE DIBUJO REAL: LECTURA DE FONDO.PNG LOCAL + FUENTE DISCORD NATIVA
 # ====================================================================
 def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
+    # Forzamos la carga del archivo físico que subiste a GitHub para garantizar los rayos azules
     try:
-        # Descargamos el fondo real con tus rayos de NicoShop
-        res_fondo = requests.get(URL_FONDO_BANNER, timeout=10)
-        base = Image.open(io.BytesIO(res_fondo.content)).convert("RGBA")
+        base = Image.open("Fondo.png").convert("RGBA")
     except Exception as e:
-        print(f"Error descargando el fondo de Imgur: {e}")
-        base = Image.new("RGBA", (738, 329), (15, 17, 20, 255))
+        print(f"Error cargando Fondo.png local: {e}")
+        try:
+            base = Image.open("fondo.png").convert("RGBA")
+        except Exception:
+            base = Image.new("RGBA", (738, 329), (15, 17, 20, 255))
 
-    # Forzamos el tamaño del lienzo
+    # Dimensiones exactas de pantalla completa estilo Koya
     base = base.resize((738, 329))
     
-    # Cargamos tu fuente física de Discord Sans
+    # Cargamos tu tipografía física de Discord
     try:
         font_bienvenido = ImageFont.truetype("discord.otf", 80)
         font_nombre = ImageFont.truetype("discord.otf", 40)
@@ -63,23 +64,23 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
         font_bienvenido = ImageFont.load_default()
         font_nombre = ImageFont.load_default()
 
-    # Capa para la sombra negra difuminada
+    # Capa para la sombra negra difuminada de las letras
     capa_sombra = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_sombra = ImageDraw.Draw(capa_sombra)
     
     texto_arriba = "BIENVENID@"
     texto_abajo = usuario_nombre.upper()
     
-    # Dibujamos las sombras desplazadas
+    # Dibujamos las sombras con un desplazamiento fuerte para que resalten sobre los rayos
     draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 255), font=font_bienvenido, anchor="mm")
     draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 255), font=font_nombre, anchor="mm")
     
-    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=4))
+    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=5))
     
-    # Fusionamos la sombra encima de tu fondo de rayos azules original
+    # Acoplamos la sombra sobre tu fondo original de NicoShop
     base = Image.alpha_composite(base, capa_sombra_difuminada)
     
-    # Capa final para las letras blancas sólidas
+    # Dibujamos el texto blanco sólido final arriba
     draw_final = ImageDraw.Draw(base)
     draw_final.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
     draw_final.text((369, 275), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
@@ -96,7 +97,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
         avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
         avatar_circular.putalpha(mascara)
         
-        # Dibujamos el contorno circular blanco
+        # Borde circular nítido blanco
         draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=4)
         base.paste(avatar_circular, (299, 34), avatar_circular)
     except Exception as e:
@@ -108,7 +109,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     return img_byte_arr
 
 # ====================================================================
-# FLUJO DE BIENVENIDA UNIFICADO (TU JSON + BANNER CON FONDO INTEGRADO)
+# FLUJO DE BIENVENIDA CORREGIDO: MENSAJE + EMBED + BANNER SUELTO FULL
 # ====================================================================
 async def ejecutar_flujo_bienvenida(member, canal):
     texto_contenido = f"👾 Bienvenid@ {member.mention} a **{member.guild.name}**!👾"
@@ -136,12 +137,12 @@ async def ejecutar_flujo_bienvenida(member, canal):
             )
             archivo_adjunto = discord.File(banner_bytes, filename="bienvenida_nicoshop.png")
             
-            # Lo inyectamos dentro del embed para que se mande todo junto a pantalla completa
-            embed.set_image(url="attachment://bienvenida_nicoshop.png")
+            # EL TRUCO MAESTRO: Enviamos el archivo suelto en el canal para que se vea
+            # GIGANTE a pantalla completa abajo del todo, exactamente igual que Koya Bot.
             await canal.send(content=texto_contenido, embed=embed, file=archivo_adjunto)
-            print(f"👋 ¡Bienvenida completa enviada por NicoShop para {member.name}!")
+            print(f"👋 ¡Bienvenida a pantalla completa enviada con éxito para {member.name}!")
         except Exception as e:
-            print(f"Error al enviar adjunto: {e}")
+            print(f"Error al enviar adjunto suelto: {e}")
             await canal.send(content=texto_contenido, embed=embed)
     else:
         await canal.send(content=texto_contenido, embed=embed)
