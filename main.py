@@ -224,16 +224,19 @@ async def on_ready():
             "\n\nA continuación encontrarás un botón de iniciar en la parte inferior donde debes clickear para aceptar que leíste las reglas y obtener tu rol para empezar!!"
             "\n\n⬇️⬇️⬇️"
         )
-embed = discord.Embed(title="【📜】┃𝐑𝐄𝐆𝐋𝐀𝐒", description=reglas_texto, color=COLOR_ANUNCIO)
-await canal.send(embed=embed, view=VistaVerificacionNativa())
-print("✅ S1: Mensaje de reglas con botón verde republicado.")
+        embed = discord.Embed(title="【📜】┃𝐑𝐄𝐆𝐋𝐀𝐒", description=reglas_texto, color=COLOR_ANUNCIO)
+        await canal.send(embed=embed, view=VistaVerificacionNativa())
+        print("✅ S1: Mensaje de reglas con botón verde republicado.")
+
 async def arrancar_todo():
-t = threading.Thread(target=mantener_vivo)
-t.daemon = True
-t.start()
-try:
-await bot.start(TOKEN_BOT)
-except Exception as e:
-print(f"Error: {e}")
-if name == "main":
-asyncio.run(arrancar_todo())
+    t = threading.Thread(target=mantener_vivo)
+    t.daemon = True
+    t.start()
+    try:
+        await bot.start(TOKEN_BOT)
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(arrancar_todo())
+
