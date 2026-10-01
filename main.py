@@ -12,7 +12,6 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 nest_asyncio.apply()
 
-# ====================================================================
 # SERVIDOR WEB INTERNO PARA RENDER
 # ====================================================================
 app = Flask('')
