@@ -143,4 +143,7 @@ async def arrancar_todo():
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.ensure_future(arrancar_todo())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(arrancar_todo())
+    loop.run_forever()
+
