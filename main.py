@@ -34,24 +34,25 @@ ID_ROL_A_DAR = 1549569521566875752
 ID_CANAL_BIENVENIDAS = 1549569523038822502  
 
 COLOR_ANUNCIO = 39423
-URL_FONDO_BANNER = "https://imgur.com"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ====================================================================
-# LÓGICA DE DIBUJO: BAJAR FUENTE REAL E INYECTAR TEXTOS 80/40 Y SOMBRAS
+# LÓGICA DE DIBUJO AVANZADA: REPLICAR BANNER DE KOYA AL 100%
 # ====================================================================
 def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     try:
-        res_fondo = requests.get(URL_FONDO_BANNER, timeout=10)
-        base = Image.open(io.BytesIO(res_fondo.content)).convert("RGBA")
-    except Exception:
-        base = Image.new("RGBA", (738, 329), (20, 22, 25, 255))
+        # Abrimos el fondo local que subiste a GitHub
+        base = Image.open("fondo.png").convert("RGBA")
+    except Exception as e:
+        print(f"No se pudo abrir fondo.png local, usando respaldo oscuro: {e}")
+        base = Image.new("RGBA", (738, 329), (15, 17, 20, 255))
 
+    # Tamaño exacto a pantalla completa que usa Koya para sus banners
     base = base.resize((738, 329))
     
-    # Descargamos una tipografía sans-serif oficial limpia para el contenedor
+    # DESCARGA DE FUENTE REAL (Permite tamaños 80/40 y renderizado perfecto)
     try:
         font_res = requests.get("https://github.com", timeout=10)
         fuente_datos = io.BytesIO(font_res.content)
@@ -59,43 +60,44 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
         fuente_datos.seek(0)
         font_nombre = ImageFont.truetype(fuente_datos, 40)
     except Exception as e:
-        print(f"No se pudo cargar la fuente descargada, usando la de respaldo: {e}")
+        print(f"Error al cargar fuente tipográfica, usando default: {e}")
         font_bienvenido = ImageFont.load_default()
         font_nombre = ImageFont.load_default()
 
+    # Creación de la capa para la sombra difuminada negra (Evita que el texto se pierda)
     capa_sombra = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_sombra = ImageDraw.Draw(capa_sombra)
     
     texto_arriba = "BIENVENID@"
     texto_abajo = usuario_nombre.upper()
     
-    # Pintamos la sombra negra difuminada corrida
-    try:
-        draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 220), font=font_bienvenido, anchor="mm")
-        draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 220), font=font_nombre, anchor="mm")
-    except Exception:
-        draw_sombra.text((369 + 2, 215 + 2), texto_arriba, fill=(0, 0, 0, 220), font=font_bienvenido, anchor="mm")
-        draw_sombra.text((369 + 2, 275 + 2), texto_abajo, fill=(0, 0, 0, 220), font=font_nombre, anchor="mm")
+    # Dibujamos la sombra desplazada en la capa inferior
+    draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 240), font=font_bienvenido, anchor="mm")
+    draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 240), font=font_nombre, anchor="mm")
     
-    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=4))
+    # Aplicamos un desenfoque Gaussiano fuerte para crear el efecto de sombra difuminada
+    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=5))
     base = Image.alpha_composite(base, capa_sombra_difuminada)
-    draw_final = ImageDraw.Draw(base)
     
-    # Pintamos las letras blancas principales encima
+    # Dibujamos el texto blanco principal arriba
+    draw_final = ImageDraw.Draw(base)
     draw_final.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
     draw_final.text((369, 275), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
 
-    # Procesamos el avatar circular con su borde blanco
+    # Procesamos el avatar circular en el centro superior
     try:
         avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
         avatar_img = avatar_img.resize((140, 140))
+        
         mascara = Image.new("L", (140, 140), 0)
         mask_draw = ImageDraw.Draw(mascara)
         mask_draw.ellipse((0, 0, 140, 140), fill=255)
+        
         avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
         avatar_circular.putalpha(mascara)
         
-        draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=3)
+        # Borde circular blanco nítido
+        draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=4)
         base.paste(avatar_circular, (299, 34), avatar_circular)
     except Exception as e:
         print(f"Error procesando avatar: {e}")
@@ -106,7 +108,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     return img_byte_arr
 
 # ====================================================================
-# FLUJO DE BIENVENIDA UNIFICADO (TU JSON + TU IMAGEN PROPIA)
+# FLUJO DE BIENVENIDA UNIFICADO (TU JSON + TU BANNER EN RECUADRO FULL)
 # ====================================================================
 async def ejecutar_flujo_bienvenida(member, canal):
     texto_contenido = f"👾 Bienvenid@ {member.mention} a **{member.guild.name}**!👾"
@@ -134,12 +136,12 @@ async def ejecutar_flujo_bienvenida(member, canal):
             )
             archivo_adjunto = discord.File(banner_bytes, filename="bienvenida_nicoshop.png")
             
-            # Forzamos la inyección del archivo dentro de la sección de imagen del Embed
-            embed.set_image(url="attachment://bienvenida_nicoshop.png")
+            # ATENCIÓN: Para que no salga como un cuadrito chiquito y se vea GIGANTE a pantalla completa
+            # igual que Koya, debemos enviar el archivo suelto, NO meterlo dentro de set_image.
             await canal.send(content=texto_contenido, embed=embed, file=archivo_adjunto)
-            print(f"👋 ¡Bienvenida e imagen enviadas juntas por NicoShop para {member.name}!")
-        except Exception as err_envio:
-            print(f"Fallo al incrustar la imagen: {err_envio}")
+            print(f"👋 ¡Bienvenida completa enviada por NicoShop para {member.name}!")
+        except Exception as e:
+            print(f"Error al enviar adjunto: {e}")
             await canal.send(content=texto_contenido, embed=embed)
     else:
         await canal.send(content=texto_contenido, embed=embed)
@@ -221,7 +223,7 @@ async def on_ready():
             "\n\n<#1549678588100485180> Canal de voz para escuchar música y disfrutarla junto a la comunidad."
             "\n\n<#1549679253748981780> Canal de voz para jugar, conversar y pasar un rato relajado."
             "\n\n<#1549679422737621093> Canal de voz destinado a realizar y participar en sorteos."
-            "\n\nA continuación encontrarás un botón de iniciar en la parte inferior donde debes clickear para aceptar que leíste las reglas y obtener tu rol para empezar!!"
+            "\n\n*A continuación encontrarás un botón de iniciar en la parte inferior donde debes clickear para aceptar que leíste las reglas y obtener tu rol para empezar!!*"
             "\n\n⬇️⬇️⬇️"
         )
         embed = discord.Embed(title="【📜】┃𝐑𝐄𝐆𝐋𝐀𝐒", description=reglas_texto, color=COLOR_ANUNCIO)
@@ -239,4 +241,3 @@ async def arrancar_todo():
 
 if __name__ == "__main__":
     asyncio.run(arrancar_todo())
-
