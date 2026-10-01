@@ -8,7 +8,7 @@ import requests
 import io
 import threading
 from flask import Flask
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 
 nest_asyncio.apply()
 
@@ -34,12 +34,12 @@ ID_ROL_A_DAR = 1549569521566875752
 ID_CANAL_BIENVENIDAS = 1549569523038822502  
 
 COLOR_ANUNCIO = 39423
-URL_FONDO_BANNER = "https://imgur.com"
+URL_FONDO_BANNER = "https://i.imgur.com/lBhnwMg.png"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# DESCARGA DE FUENTE SANS-SERIF ESTILO DISCORD
+# DESCARGA DE FUENTE REFORZADA PARA EL ESTILO DE DISCORD
 try:
     font_res = requests.get("https://github.com")
     fuente_bytes = io.BytesIO(font_res.content)
@@ -47,7 +47,7 @@ except Exception:
     fuente_bytes = None
 
 # ====================================================================
-# LÓGICA DE DIBUJO: REPLICAR EL BANNER TAL CUAL LA IMAGEN
+# LÓGICA DE DIBUJO: REPLICAR EL BANNER CON TAMAÑOS 80/40 Y SOMBRAS
 # ====================================================================
 def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     try:
@@ -56,11 +56,46 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     except Exception:
         base = Image.new("RGBA", (738, 329), (20, 22, 25, 255))
 
-    # Redimensionamos la imagen al tamaño exacto estándar de los flyers de bienvenida (738x329)
+    # Forzamos el tamaño nativo de tu flyer (738x329)
     base = base.resize((738, 329))
-    draw = ImageDraw.Draw(base)
     
-    # 1. Procesamos el avatar del usuario en un círculo perfecto centrado
+    # 1. Cargar fuentes con los tamaños exactos solicitados (80 y 40)
+    try:
+        if fuente_bytes:
+            fuente_bytes.seek(0)
+            font_bienvenido = ImageFont.truetype(fuente_bytes, 80)
+            fuente_bytes.seek(0)
+            font_nombre = ImageFont.truetype(fuente_bytes, 40)
+        else:
+            font_bienvenido = ImageFont.load_default()
+            font_nombre = ImageFont.load_default()
+    except Exception:
+        font_bienvenido = ImageFont.load_default()
+        font_nombre = ImageFont.load_default()
+
+    # 2. Creamos una capa transparente separada para dibujar la sombra negra difuminada
+    capa_sombra = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    draw_sombra = ImageDraw.Draw(capa_sombra)
+    
+    texto_arriba = "BIENVENID@"
+    texto_abajo = usuario_nombre.upper()
+    
+    # Dibujamos los textos negros de la sombra desplazados (+4, +4)
+    draw_sombra.text((369 + 4, 215 + 4), texto_arriba, fill=(0, 0, 0, 220), font=font_bienvenido, anchor="mm")
+    draw_sombra.text((369 + 4, 275 + 4), texto_abajo, fill=(0, 0, 0, 220), font=font_nombre, anchor="mm")
+    
+    # Aplicamos un desenfoque (blur) a la capa de la sombra para que se vea difuminada y suave
+    capa_sombra_difuminada = capa_sombra.filter(ImageFilter.GaussianBlur(radius=5))
+    
+    # Combinamos la sombra difuminada sobre el fondo original
+    base = Image.alpha_composite(base, capa_sombra_difuminada)
+    draw_final = ImageDraw.Draw(base)
+    
+    # 3. Dibujamos los textos principales arriba en color blanco puro sólido
+    draw_final.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
+    draw_final.text((369, 275), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
+
+    # 4. Procesamos el avatar en un círculo perfecto centrado arriba
     try:
         avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
         avatar_img = avatar_img.resize((140, 140))
@@ -72,34 +107,11 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
         avatar_circular = ImageOps.fit(avatar_img, (140, 140), centering=(0.5, 0.5))
         avatar_circular.putalpha(mascara)
         
-        # Dibujamos un contorno blanco circular delgado de fondo para resaltar el avatar
-        draw.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=3)
-        # Pegamos el avatar en el centro superior del banner
+        # Contorno circular blanco idéntico al de tu captura
+        draw_final.ellipse((296, 31, 442, 177), outline=(255, 255, 255, 255), width=3)
         base.paste(avatar_circular, (299, 34), avatar_circular)
     except Exception as e:
         print(f"Error procesando avatar: {e}")
-
-    # 2. Configuramos las fuentes tipográficas estilo Discord
-    try:
-        if fuente_bytes:
-            fuente_bytes.seek(0)
-            font_bienvenido = ImageFont.truetype(fuente_bytes, 42)
-            fuente_bytes.seek(0)
-            font_nombre = ImageFont.truetype(fuente_bytes, 28)
-        else:
-            font_bienvenido = ImageFont.load_default()
-            font_nombre = ImageFont.load_default()
-    except Exception:
-        font_bienvenido = ImageFont.load_default()
-        font_nombre = ImageFont.load_default()
-
-    # 3. Estampamos los textos centrados imitando tu captura al 100%
-    texto_arriba = "BIENVENID@"
-    texto_abajo = usuario_nombre.upper() # Lo fuerza a mayúsculas como en la imagen
-    
-    # Letras blancas sólidas con la distribución exacta de tu flyer
-    draw.text((369, 215), texto_arriba, fill=(255, 255, 255, 255), font=font_bienvenido, anchor="mm")
-    draw.text((369, 265), texto_abajo, fill=(255, 255, 255, 255), font=font_nombre, anchor="mm")
     
     img_byte_arr = io.BytesIO()
     base.save(img_byte_arr, format="PNG")
@@ -107,7 +119,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     return img_byte_arr
 
 # ====================================================================
-# FLUJO DE BIENVENIDA (TU JSON EXACTO) + BANNER REPLICADO
+# FLUJO DE BIENVENIDA (TU JSON EXACTO) + BANNER PERSONALIZADO
 # ====================================================================
 async def ejecutar_flujo_bienvenida(member, canal):
     texto_contenido = f"👾 Bienvenid@ {member.mention} a **{member.guild.name}**!👾"
@@ -174,7 +186,6 @@ async def probar(ctx):
 async def on_ready():
     print(f"\n🟢 [SISTEMA MAESTRO ONLINE - NICOSHOP]")
     print(f"🤖 Bot conectado como: {bot.user}")
-    print("👉 Celda activa. Vigilando reglas y bienvenidas al mismo tiempo.")
     
     canal = bot.get_channel(ID_CANAL_REGLAS)
     if canal:
@@ -233,3 +244,4 @@ except Exception as e:
 print(f"Error: {e}")
 if name == "main":
 asyncio.run(arrancar_todo())
+
