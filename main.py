@@ -63,7 +63,7 @@ def crear_banner_estilo_koya(usuario_nombre, avatar_bytes):
     
     # Cargamos tu tipografía física de Discord
     try:
-        font_bienvenido = ImageFont.truetype("discord.otf", 80)
+        font_bienvenido = ImageFont.truetype("discord.otf", 60)
         font_nombre = ImageFont.truetype("discord.otf", 40)
     except Exception as e:
         print(f"Error al cargar discord.otf: {e}")
