@@ -1,8 +1,5 @@
+import init
 import discord
-import os
-import sys
-import types
-sys.modules['audioop'] = types.ModuleType('audioop')
 from discord.ext import commands
 import asyncio
 import nest_asyncio
